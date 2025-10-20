@@ -1,0 +1,46 @@
+name: ONVIF Voice Assistant
+version: "1.0.0"
+slug: onvif_voice_assistant
+description: Voice recognition from ONVIF camera using Wyoming Faster Whisper
+arch:
+  - aarch64
+  - amd64
+  - armhf
+  - armv7
+  - i386
+init: false
+startup: application
+boot: auto
+map:
+  - config:rw
+options:
+  wyoming_host: "localhost"
+  wyoming_port: 10300
+  rtsp_url: "rtsp://admin:password@192.168.1.100:554/stream"
+  sample_rate: 16000
+  channels: 1
+  chunk_duration: 2
+  vad_enabled: true
+  vad_threshold: 0.5
+  commands:
+    - pattern: "ligar a luz"
+      action: "light.turn_on"
+      entity_id: "light.sala"
+  homeassistant_api: true
+  log_level: "info"
+schema:
+  wyoming_host: str
+  wyoming_port: int
+  rtsp_url: str
+  sample_rate: int
+  channels: int
+  chunk_duration: float
+  vad_enabled: bool
+  vad_threshold: float
+  commands:
+    - pattern: str
+      action: str
+      entity_id: str?
+      service_data: str?
+  log_level: list(debug|info|warning|error)
+image: ghcr.io/homeassistant/{arch}-addon-onvif-voice-assistant
