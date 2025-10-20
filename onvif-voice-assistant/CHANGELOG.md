@@ -1,5 +1,27 @@
 # Changelog
 
+## [1.4.0] - 2025-10-20
+### 🔄 Major Refactor
+- **ESTRUTURA S6-OVERLAY**: Refatorado para usar S6-overlay corretamente
+  - Criada estrutura `rootfs/` conforme padrão oficial do HA
+  - Service em `rootfs/etc/services.d/onvif-voice-assistant/`
+  - Script `run` com bashio para logging padronizado
+  - Script `finish` para cleanup ao parar
+  - App movido para `rootfs/app/app.py`
+- **DOCKERFILE**: Removido CMD, agora usa S6-overlay da imagem base
+  - `COPY rootfs /` ao invés de copiar arquivos individuais
+  - S6 inicia automaticamente como PID 1
+  - `init: false` agora correto (S6 é o init system)
+
+### 🐛 Fixed
+- **SUPERVISOR_TOKEN injection**: S6-overlay corretamente configurado deve resolver injeção de variáveis de ambiente
+  - Imagens base do HA (`ghcr.io/home-assistant/*-base-python`) já incluem S6-overlay
+  - Com `init: false`, S6 roda como PID 1 e gerencia variáveis de ambiente
+
+### 📚 Reference
+- Baseado em [home-assistant/addons-example](https://github.com/home-assistant/addons-example)
+- [docker-base](https://github.com/home-assistant/docker-base) inclui S6-overlay, Bashio e TempIO
+
 ## [1.3.5] - 2025-10-20
 ### 🐛 Fixed
 - **CRITICAL: SUPERVISOR_TOKEN ainda ausente**: Mudado `init: true` no config.yaml

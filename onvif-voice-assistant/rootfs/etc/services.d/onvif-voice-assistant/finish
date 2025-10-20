@@ -1,0 +1,6 @@
+#!/usr/bin/with-contenv bashio
+# ==============================================================================
+# Cleanup when service stops
+# ==============================================================================
+
+bashio::log.warning "ONVIF Voice Assistant stopped!"

@@ -15,17 +15,10 @@ RUN apk add --no-cache \
     ffmpeg \
     && rm -rf /var/cache/apk/*
 
-# Diretório de trabalho
-WORKDIR /app
+# Instalar dependências Python
+COPY requirements.txt /tmp/
+RUN pip3 install --no-cache-dir -r /tmp/requirements.txt
 
-# Copiar arquivos
-COPY requirements.txt .
-RUN pip3 install --no-cache-dir -r requirements.txt
-
-COPY *.py .
-COPY run.sh .
-RUN chmod +x run.sh
-
-# Executar
-CMD ["/app/run.sh"]
+# Copiar root filesystem (S6-Overlay structure)
+COPY rootfs /
 

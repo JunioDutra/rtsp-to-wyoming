@@ -1,0 +1,9 @@
+#!/usr/bin/with-contenv bashio
+# ==============================================================================
+# Start ONVIF Voice Assistant service
+# ==============================================================================
+
+bashio::log.info "Starting ONVIF Voice Assistant..."
+
+# Executar aplicação Python
+exec python3 /app/app.py
