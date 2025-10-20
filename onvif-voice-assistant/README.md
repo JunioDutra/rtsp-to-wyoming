@@ -1,10 +1,6 @@
-# ONVIF Voice Assistant Add-on Repository
+# ONVIF Voice Assistant for Home Assistant
 
-Este repositório contém o addon ONVIF Voice Assistant para Home Assistant.
-
-## Sobre
-
-Conecta o áudio de câmeras ONVIF ao Wyoming Faster Whisper para reconhecimento de voz e execução de comandos no Home Assistant.
+Este addon conecta o áudio de uma câmera ONVIF ao Wyoming Faster Whisper para reconhecimento de voz e execução de comandos no Home Assistant.
 
 ## 🎯 Funcionalidades
 
@@ -25,26 +21,7 @@ Conecta o áudio de câmeras ONVIF ao Wyoming Faster Whisper para reconhecimento
    - Com áudio habilitado
    - URL RTSP acessível
 
-## Instalação
-
-1. Adicione este repositório ao Home Assistant:
-   - Vá em **Supervisor → Add-on Store → ⋮ (menu) → Repositories**
-   - Cole a URL: `https://github.com/JunioDutra/rtsp-to-wyoming`
-   - Clique em **Add**
-
-2. Procure por "ONVIF Voice Assistant" na Add-on Store
-
-3. Clique em **Install**
-
-## Addons Incluídos
-
-- **ONVIF Voice Assistant** - Reconhecimento de voz a partir de câmeras ONVIF
-
----
-
-# Documentação do Addon
-
-
+## 🚀 Instalação
 
 ### Método 1: Via repositório Git (recomendado)
 
