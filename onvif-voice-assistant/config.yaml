@@ -1,5 +1,5 @@
 name: ONVIF Voice Assistant
-version: "1.3.4"
+version: "1.3.5"
 slug: onvif_voice_assistant
 description: Voice recognition from ONVIF camera using Wyoming Faster Whisper
 arch:
@@ -8,7 +8,7 @@ arch:
   - armhf
   - armv7
   - i386
-init: false
+init: true
 startup: application
 boot: auto
 homeassistant_api: true

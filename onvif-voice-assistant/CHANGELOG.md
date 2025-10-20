@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.3.5] - 2025-10-20
+### 🐛 Fixed
+- **CRITICAL: SUPERVISOR_TOKEN ainda ausente**: Mudado `init: true` no config.yaml
+  - **Root cause**: `init: false` é apenas para addons com S6-overlay próprio
+  - Com `init: false`, Supervisor não injeta variáveis de ambiente corretamente
+  - Este addon não usa S6-overlay, precisa do Docker default init
+  - **Resultado**: Supervisor agora deve injetar `SUPERVISOR_TOKEN` corretamente
+
+### 📚 Reference
+- Baseado na [documentação oficial](https://developers.home-assistant.io/docs/add-ons/configuration/#optional-configuration-options):
+  > "Set this to false to disable the Docker default system init. Use this if the image has its own init system (Like s6-overlay)"
+
 ## [1.3.4] - 2025-10-20
 ### 🐛 Fixed
 - **CRITICAL: SUPERVISOR_TOKEN missing**: Adicionadas labels obrigatórias no Dockerfile
