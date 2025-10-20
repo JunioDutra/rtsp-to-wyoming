@@ -86,9 +86,13 @@ class WyomingClient:
             
             if response and response.get("type") == "transcript":
                 text = response.get("data", {}).get("text", "")
-                logger.info(f"Transcription received: {text}")
+                if text:
+                    logger.info(f"Transcription received: '{text}'")
+                else:
+                    logger.debug("Empty transcription received")
                 return text
             
+            logger.debug("No transcript response received")
             return None
             
         except Exception as e:
@@ -167,6 +171,8 @@ class AudioBuffer:
             is_speech = True  # Se VAD falhar, assume que é fala
         
         if is_speech:
+            if not self.is_speaking:
+                logger.debug("🎤 Voice activity detected - Recording started")
             self.is_speaking = True
             self.silence_frames = 0
             self.buffer.append(frame)
@@ -177,6 +183,8 @@ class AudioBuffer:
             # Se silêncio durar muito, considera que a fala terminou
             if self.silence_frames >= self.max_silence_frames:
                 audio_data = b"".join(self.buffer)
+                duration_seconds = len(audio_data) / (self.sample_rate * 2)  # 2 bytes per sample
+                logger.debug(f"🔇 Silence detected - Recording stopped (duration: {duration_seconds:.2f}s, {len(audio_data)} bytes)")
                 self.reset()
                 return audio_data
         
@@ -287,8 +295,11 @@ class ONVIFVoiceAssistant:
                             
                             # Processar a cada X segundos
                             buffer_duration = len(self.audio_buffer.buffer) * 0.03
-                            if buffer_duration >= self.config.get("chunk_duration", 2):
+                            chunk_target = self.config.get("chunk_duration", 2)
+                            
+                            if buffer_duration >= chunk_target:
                                 complete_audio = b"".join(self.audio_buffer.buffer)
+                                logger.debug(f"🎵 Accumulated {buffer_duration:.1f}s of audio (target: {chunk_target}s)")
                                 self.audio_buffer.reset()
                                 await self._transcribe_and_process(complete_audio)
         
@@ -297,6 +308,9 @@ class ONVIFVoiceAssistant:
     async def _transcribe_and_process(self, audio_data: bytes):
         """Transcreve áudio e processa comandos"""
         try:
+            duration = len(audio_data) / (self.config["sample_rate"] * 2)
+            logger.debug(f"📤 Sending audio to Wyoming: {len(audio_data)} bytes ({duration:.2f}s)")
+            
             # Enviar para Wyoming Whisper
             text = await asyncio.get_event_loop().run_in_executor(
                 None,
@@ -307,10 +321,12 @@ class ONVIFVoiceAssistant:
             
             if text:
                 text = text.strip().lower()
-                logger.info(f"Recognized: '{text}'")
+                logger.info(f"✅ Recognized text: '{text}'")
                 
                 # Processar comandos
                 await self._process_command(text)
+            else:
+                logger.debug("⚠️  No text recognized (empty or failed transcription)")
                 
         except Exception as e:
             logger.error(f"Error transcribing audio: {e}")
@@ -319,16 +335,18 @@ class ONVIFVoiceAssistant:
         """Processa comandos reconhecidos"""
         commands = self.config.get("commands", [])
         
+        logger.debug(f"🔍 Checking {len(commands)} command patterns for: '{text}'")
+        
         for command in commands:
             pattern = command["pattern"].lower()
             
             # Match simples (pode melhorar com fuzzy matching)
             if pattern in text:
-                logger.info(f"Command matched: {pattern}")
+                logger.info(f"🎯 Command matched! Pattern: '{pattern}' → Action: {command['action']}")
                 await self._execute_action(command)
                 return
         
-        logger.debug(f"No command matched for: '{text}'")
+        logger.info(f"❌ No command matched for text: '{text}'")
     
     async def _execute_action(self, command: dict):
         """Executa ação no Home Assistant"""
@@ -336,6 +354,8 @@ class ONVIFVoiceAssistant:
             action = command["action"]
             entity_id = command.get("entity_id")
             service_data = command.get("service_data", {})
+            
+            logger.debug(f"🚀 Executing: {action} on {entity_id}")
             
             # Chamar serviço do Home Assistant
             url = "http://supervisor/core/api/services/" + action.replace(".", "/")
@@ -348,6 +368,9 @@ class ONVIFVoiceAssistant:
                 service_data = json.loads(service_data)
             payload.update(service_data)
             
+            logger.debug(f"📡 Request URL: {url}")
+            logger.debug(f"📦 Payload: {payload}")
+            
             headers = {
                 "Authorization": f"Bearer {os.environ.get('SUPERVISOR_TOKEN')}",
                 "Content-Type": "application/json"
@@ -356,12 +379,12 @@ class ONVIFVoiceAssistant:
             response = requests.post(url, json=payload, headers=headers, timeout=10)
             
             if response.ok:
-                logger.info(f"Action executed: {action} on {entity_id}")
+                logger.info(f"✅ Action executed successfully: {action} on {entity_id}")
             else:
-                logger.error(f"Failed to execute action: {response.status_code} - {response.text}")
+                logger.error(f"❌ Failed to execute action: {response.status_code} - {response.text}")
                 
         except Exception as e:
-            logger.error(f"Error executing action: {e}")
+            logger.error(f"❌ Error executing action: {e}")
     
     def stop(self):
         """Para o assistente"""
