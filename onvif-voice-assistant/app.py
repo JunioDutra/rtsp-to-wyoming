@@ -151,21 +151,32 @@ class AudioBuffer:
         
         if is_speech:
             if not self.is_speaking:
-                logger.debug("🎤 Voice activity detected - Recording started")
+                logger.info("🎤 Voice activity detected - Recording started")
             self.is_speaking = True
             self.silence_frames = 0
             self.buffer.append(frame)
+            
+            # Log periódico durante gravação
+            if len(self.buffer) % 50 == 0:
+                duration = len(b"".join(self.buffer)) / (self.sample_rate * 2)
+                logger.debug(f"📼 Recording... {duration:.1f}s ({len(self.buffer)} frames)")
         elif self.is_speaking:
             self.silence_frames += 1
             self.buffer.append(frame)
+            
+            # Log de silêncio
+            if self.silence_frames == 1:
+                logger.debug(f"🔇 Silence started (frames: {len(self.buffer)})")
             
             # Se silêncio durar muito, considera que a fala terminou
             if self.silence_frames >= self.max_silence_frames:
                 audio_data = b"".join(self.buffer)
                 duration_seconds = len(audio_data) / (self.sample_rate * 2)  # 2 bytes per sample
-                logger.debug(f"🔇 Silence detected - Recording stopped (duration: {duration_seconds:.2f}s, {len(audio_data)} bytes)")
+                logger.info(f"✅ Recording complete: {duration_seconds:.2f}s, {len(audio_data)} bytes, silence frames: {self.silence_frames}")
                 self.reset()
                 return audio_data
+            elif self.silence_frames % 10 == 0:
+                logger.debug(f"🔇 Silence continuing... {self.silence_frames}/{self.max_silence_frames} frames")
         
         return None
     
@@ -240,6 +251,9 @@ class ONVIFVoiceAssistant:
         
         logger.info("Processing audio stream...")
         
+        frame_count = 0
+        vad_check_count = 0
+        
         for packet in container.demux(audio_stream):
             if not self.running:
                 break
@@ -261,8 +275,20 @@ class ONVIFVoiceAssistant:
                         if len(chunk) < frame_size:
                             continue
                         
+                        frame_count += 1
+                        
+                        # Log inicial para debug
+                        if frame_count == 1:
+                            logger.debug(f"📊 Frame size: {frame_size} bytes ({frame_size//2} samples = 30ms)")
+                        
                         # VAD e buffer
                         if self.config.get("vad_enabled", True):
+                            vad_check_count += 1
+                            
+                            # Log periódico para confirmar que está processando
+                            if vad_check_count % 1000 == 0:
+                                logger.debug(f"📡 Processed {vad_check_count} VAD checks ({vad_check_count * 0.03:.0f}s of audio)")
+                            
                             complete_audio = self.audio_buffer.add_frame(chunk)
                             
                             if complete_audio:
