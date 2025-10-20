@@ -1,5 +1,26 @@
 # Changelog
 
+## [1.3.3] - 2025-10-20
+### 🐛 Fixed
+- **Pattern matching incorreto**: "desligar" não vai mais dar match em "ligar"
+  - Implementado match de palavras completas
+  - Suporta partial match com ordem correta ("por favor ligar a luz" → "ligar a luz")
+  - Remove pontuação final antes de comparar
+- **Erro 401 Unauthorized**: Corrigido formato da URL da API
+  - URL: `http://supervisor/core/api/services/{domain}/{service}` (formato correto)
+  - Melhor validação do formato de action (`domain.service`)
+  - Fallback automático: SUPERVISOR_TOKEN → HASSIO_TOKEN
+  - Logs detalhados de ambiente e autenticação no startup
+- **Debugging melhorado**: 
+  - Verifica tokens disponíveis ao iniciar
+  - Mostra preview do token sendo usado
+  - Traceback completo em caso de erro na execução
+
+### 🎯 Improvements
+- Pattern matching agora exige palavras completas na ordem correta
+- Melhor logging de autenticação, ambiente e debug de erros
+- Validação do formato de action antes de enviar request
+
 ## [1.3.2] - 2025-10-20
 ### 🐛 Fixed
 - **VAD muito sensível**: Aumentada agressividade do WebRTC VAD de 2 para 3 (menos false positives de ruído ambiente)

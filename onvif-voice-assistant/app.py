@@ -356,16 +356,36 @@ class ONVIFVoiceAssistant:
         
         logger.debug(f"🔍 Checking {len(commands)} command patterns for: '{text}'")
         
+        # Normalizar texto (remover pontuação final)
+        text_clean = text.strip().rstrip('.,!?')
+        
         for command in commands:
-            pattern = command["pattern"].lower()
+            pattern = command["pattern"].lower().strip()
             
-            # Match simples (pode melhorar com fuzzy matching)
-            if pattern in text:
+            # Match com palavras completas (evita "ligar" dar match em "desligar")
+            # Aceita se o pattern é exatamente o texto OU se está como palavra completa
+            text_words = text_clean.split()
+            pattern_words = pattern.split()
+            
+            # Exact match
+            if text_clean == pattern:
                 logger.info(f"🎯 Command matched! Pattern: '{pattern}' → Action: {command['action']}")
                 await self._execute_action(command)
                 return
+            
+            # Partial match com palavras completas (ex: "por favor ligar a luz" deve dar match em "ligar a luz")
+            if all(word in text_words for word in pattern_words):
+                # Verificar se as palavras aparecem na ordem correta
+                try:
+                    indices = [text_words.index(word) for word in pattern_words]
+                    if indices == sorted(indices):  # Palavras na ordem
+                        logger.info(f"🎯 Command matched! Pattern: '{pattern}' → Action: {command['action']}")
+                        await self._execute_action(command)
+                        return
+                except ValueError:
+                    pass
         
-        logger.info(f"❌ No command matched for text: '{text}'")
+        logger.info(f"❌ No command matched for text: '{text_clean}'")
     
     async def _execute_action(self, command: dict):
         """Executa ação no Home Assistant"""
@@ -376,8 +396,27 @@ class ONVIFVoiceAssistant:
             
             logger.debug(f"🚀 Executing: {action} on {entity_id}")
             
-            # Chamar serviço do Home Assistant
-            url = "http://supervisor/core/api/services/" + action.replace(".", "/")
+            # Obter token de autenticação primeiro
+            token = os.environ.get('SUPERVISOR_TOKEN')
+            if not token:
+                logger.warning("⚠️  SUPERVISOR_TOKEN not found, trying HASSIO_TOKEN...")
+                token = os.environ.get('HASSIO_TOKEN')
+            
+            if not token:
+                logger.error("❌ No authentication token found!")
+                logger.error("💡 Make sure 'homeassistant_api: true' is set in config.yaml")
+                logger.error("� Available env vars: " + ", ".join([k for k in os.environ.keys() if 'TOKEN' in k or 'SUPERVISOR' in k]))
+                return
+            
+            # Dividir action em domain e service (ex: "light.turn_on" -> "light", "turn_on")
+            try:
+                domain, service = action.split(".", 1)
+            except ValueError:
+                logger.error(f"❌ Invalid action format: '{action}'. Expected 'domain.service'")
+                return
+            
+            # URL correta da API do Home Assistant via Supervisor
+            url = f"http://supervisor/core/api/services/{domain}/{service}"
             
             payload = {}
             if entity_id:
@@ -387,23 +426,27 @@ class ONVIFVoiceAssistant:
                 service_data = json.loads(service_data)
             payload.update(service_data)
             
-            logger.debug(f"📡 Request URL: {url}")
-            logger.debug(f"📦 Payload: {payload}")
-            
             headers = {
-                "Authorization": f"Bearer {os.environ.get('SUPERVISOR_TOKEN')}",
+                "Authorization": f"Bearer {token}",
                 "Content-Type": "application/json"
             }
+            
+            logger.debug(f"📡 Request URL: {url}")
+            logger.debug(f"📦 Payload: {payload}")
+            logger.debug(f"🔐 Using token: {token[:10]}***")
             
             response = requests.post(url, json=payload, headers=headers, timeout=10)
             
             if response.ok:
                 logger.info(f"✅ Action executed successfully: {action} on {entity_id}")
             else:
-                logger.error(f"❌ Failed to execute action: {response.status_code} - {response.text}")
+                logger.error(f"❌ Failed to execute action: {response.status_code}")
+                logger.error(f"📄 Response: {response.text}")
                 
         except Exception as e:
             logger.error(f"❌ Error executing action: {e}")
+            import traceback
+            logger.debug(traceback.format_exc())
     
     def stop(self):
         """Para o assistente"""
@@ -426,6 +469,14 @@ async def main():
     # Ajustar nível de log
     log_level = config.get("log_level", "info").upper()
     logging.getLogger().setLevel(getattr(logging, log_level))
+    
+    # Debug: Mostrar variáveis de ambiente relevantes
+    logger.info("🔍 Environment check:")
+    logger.info(f"  - SUPERVISOR_TOKEN: {'✅ Present' if os.environ.get('SUPERVISOR_TOKEN') else '❌ Missing'}")
+    logger.info(f"  - HASSIO_TOKEN: {'✅ Present' if os.environ.get('HASSIO_TOKEN') else '❌ Missing'}")
+    if os.environ.get('SUPERVISOR_TOKEN'):
+        token = os.environ.get('SUPERVISOR_TOKEN')
+        logger.debug(f"  - Token preview: {token[:10]}***")
     
     # Criar e iniciar assistente
     assistant = ONVIFVoiceAssistant(config)
