@@ -89,7 +89,10 @@ class WyomingClient:
                 logger.info("🛑 AudioStop sent - waiting for transcript...")
                 
                 # 4. Aguardar resposta Transcript (como Wyoming Satellite)
-                timeout = 30.0
+                # Timeout ajustado baseado no tamanho do áudio (1s por 2s de áudio, min 30s, max 60s)
+                audio_duration = len(audio_data) / (16000 * 2)  # 16kHz, 2 bytes per sample
+                timeout = max(30.0, min(60.0, audio_duration * 0.5))
+                logger.debug(f"⏱️  Waiting for transcript (timeout: {timeout:.1f}s for {audio_duration:.1f}s audio)")
                 start_time = asyncio.get_event_loop().time()
                 
                 while True:
@@ -132,11 +135,13 @@ class AudioBuffer:
     def __init__(self, sample_rate: int = 16000, vad_threshold: float = 0.5):
         self.sample_rate = sample_rate
         self.buffer = []
-        self.vad = webrtcvad.Vad(2)  # Agressividade média (0-3)
+        self.vad = webrtcvad.Vad(3)  # Agressividade MÁXIMA (0-3) para reduzir false positives
         self.vad_threshold = vad_threshold
         self.is_speaking = False
         self.silence_frames = 0
-        self.max_silence_frames = 20  # ~600ms de silêncio para finalizar
+        self.max_silence_frames = 30  # ~900ms de silêncio (aumentado de 20)
+        self.max_recording_frames = 1000  # Máximo 30s de gravação (1000 frames × 30ms)
+        self.recorded_frames = 0
         
     def add_frame(self, frame: bytes) -> Optional[bytes]:
         """
@@ -152,14 +157,24 @@ class AudioBuffer:
         if is_speech:
             if not self.is_speaking:
                 logger.info("🎤 Voice activity detected - Recording started")
+                self.recorded_frames = 0
             self.is_speaking = True
             self.silence_frames = 0
             self.buffer.append(frame)
+            self.recorded_frames += 1
+            
+            # LIMITE MÁXIMO: Forçar finalização após 30s
+            if self.recorded_frames >= self.max_recording_frames:
+                audio_data = b"".join(self.buffer)
+                duration_seconds = len(audio_data) / (self.sample_rate * 2)
+                logger.warning(f"⚠️  Max recording duration reached! Forcing stop: {duration_seconds:.2f}s, {len(audio_data)} bytes")
+                self.reset()
+                return audio_data
             
             # Log periódico durante gravação
-            if len(self.buffer) % 50 == 0:
-                duration = len(b"".join(self.buffer)) / (self.sample_rate * 2)
-                logger.debug(f"📼 Recording... {duration:.1f}s ({len(self.buffer)} frames)")
+            if self.recorded_frames % 50 == 0:
+                duration = self.recorded_frames * 0.03
+                logger.debug(f"📼 Recording... {duration:.1f}s ({self.recorded_frames}/{self.max_recording_frames} frames)")
         elif self.is_speaking:
             self.silence_frames += 1
             self.buffer.append(frame)
@@ -185,6 +200,7 @@ class AudioBuffer:
         self.buffer = []
         self.is_speaking = False
         self.silence_frames = 0
+        self.recorded_frames = 0
 
 
 class ONVIFVoiceAssistant:

@@ -1,6 +1,25 @@
 # Changelog
 
-## [1.3.0] - 2025-01-20
+## [1.3.2] - 2025-10-20
+### 🐛 Fixed
+- **VAD muito sensível**: Aumentada agressividade do WebRTC VAD de 2 para 3 (menos false positives de ruído ambiente)
+- **Gravações infinitas**: Adicionado limite máximo de 30s de gravação contínua
+- **Timeout inadequado**: Timeout dinâmico baseado no tamanho do áudio (min 30s, max 60s)
+- **Silêncio muito curto**: Aumentado threshold de silêncio de 600ms para 900ms
+
+### 🎯 Changes
+- VAD aggressiveness: 2 → 3 (MAXIMUM)
+- Max silence frames: 20 → 30 (~900ms)
+- Max recording duration: unlimited → 30s (1000 frames)
+- Wyoming timeout: fixed 30s → dynamic 30-60s based on audio length
+
+## [1.3.1] - 2025-10-20
+### 🐛 Debug
+- Adicionados logs detalhados para debug do pipeline VAD
+- Contador de frames gravados e progresso de gravação
+- Log de detecção de silêncio e threshold
+
+## [1.3.0] - 2025-10-20
 ### Changed
 - **BREAKING**: Refatorado `WyomingClient` para seguir padrão Wyoming Satellite
   - Removido envio de evento `Transcribe` (usado apenas em clientes ASR diretos)
