@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.3.4] - 2025-10-20
+### 🐛 Fixed
+- **CRITICAL: SUPERVISOR_TOKEN missing**: Adicionadas labels obrigatórias no Dockerfile
+  - `io.hass.version`: Versão do addon
+  - `io.hass.type="addon"`: Identifica como addon oficial
+  - `io.hass.arch`: Arquiteturas suportadas
+- **Resultado**: Supervisor agora injeta automaticamente `SUPERVISOR_TOKEN` no ambiente
+- **Solução**: Comandos do Home Assistant agora funcionam (sem erro 401)
+
+### 📚 Reference
+- Baseado na [documentação oficial do HA](https://developers.home-assistant.io/docs/add-ons/configuration/#add-on-dockerfile)
+- Labels são obrigatórias para integração com Supervisor
+
 ## [1.3.3] - 2025-10-20
 ### 🐛 Fixed
 - **Pattern matching incorreto**: "desligar" não vai mais dar match em "ligar"

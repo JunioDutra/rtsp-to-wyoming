@@ -1,6 +1,13 @@
 ARG BUILD_FROM
 FROM $BUILD_FROM
 
+# Labels obrigatórias para o Home Assistant Supervisor
+ARG BUILD_VERSION
+LABEL \
+  io.hass.version="${BUILD_VERSION}" \
+  io.hass.type="addon" \
+  io.hass.arch="armhf|aarch64|i386|amd64|armv7"
+
 # Instalar dependências do sistema
 RUN apk add --no-cache \
     python3 \
