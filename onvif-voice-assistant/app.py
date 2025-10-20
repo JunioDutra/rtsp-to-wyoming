@@ -8,18 +8,19 @@ import asyncio
 import json
 import logging
 import os
-import socket
-import struct
 import sys
+import tempfile
 import wave
 from pathlib import Path
 from typing import Optional
-import io
 
 import av
 import numpy as np
 import requests
 import webrtcvad
+from wyoming.asr import Transcribe, Transcript
+from wyoming.audio import AudioChunk, AudioStart, AudioStop
+from wyoming.client import AsyncClient
 
 # Configuração de logging
 logging.basicConfig(
@@ -31,120 +32,98 @@ logger = logging.getLogger(__name__)
 
 
 class WyomingClient:
-    """Cliente para comunicação com Wyoming Protocol"""
+    """Cliente para comunicação com Wyoming Protocol usando biblioteca oficial"""
     
     def __init__(self, host: str, port: int):
         self.host = host
         self.port = port
-        self.socket: Optional[socket.socket] = None
+        self.uri = f"tcp://{host}:{port}"
         
-    def connect(self):
-        """Conecta ao servidor Wyoming"""
-        try:
-            self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.socket.connect((self.host, self.port))
-            logger.info(f"Connected to Wyoming server at {self.host}:{self.port}")
-            return True
-        except Exception as e:
-            logger.error(f"Failed to connect to Wyoming server: {e}")
-            return False
-    
-    def send_audio(self, audio_data: bytes, sample_rate: int = 16000, sample_width: int = 2, channels: int = 1) -> Optional[str]:
+    async def send_audio(self, audio_data: bytes, sample_rate: int = 16000, sample_width: int = 2, channels: int = 1) -> Optional[str]:
         """
-        Envia áudio para Wyoming e recebe transcrição
-        
-        Wyoming Protocol format:
-        - Header: tipo de mensagem (audio-chunk, audio-stop, etc)
-        - Payload: dados do áudio em PCM
+        Envia áudio para Wyoming e recebe transcrição usando protocolo oficial
         """
         try:
-            if not self.socket:
-                if not self.connect():
-                    return None
+            logger.debug(f"📨 Connecting to Wyoming at {self.uri}")
             
-            # Enviar início da transcrição
-            self._send_message({
-                "type": "transcribe",
-                "data": {
-                    "rate": sample_rate,
-                    "width": sample_width,
-                    "channels": channels
-                }
-            })
-            
-            # Enviar chunks de áudio
-            chunk_size = 8192
-            for i in range(0, len(audio_data), chunk_size):
-                chunk = audio_data[i:i + chunk_size]
-                self._send_audio_chunk(chunk)
-            
-            # Sinalizar fim do áudio
-            self._send_message({"type": "audio-stop"})
-            
-            # Receber transcrição
-            response = self._receive_message()
-            
-            if response and response.get("type") == "transcript":
-                text = response.get("data", {}).get("text", "")
-                if text:
-                    logger.info(f"Transcription received: '{text}'")
-                else:
-                    logger.debug("Empty transcription received")
-                return text
-            
-            logger.debug("No transcript response received")
-            return None
-            
-        except Exception as e:
-            logger.error(f"Error sending audio to Wyoming: {e}")
-            self.disconnect()
-            return None
-    
-    def _send_message(self, message: dict):
-        """Envia mensagem JSON para Wyoming"""
-        data = json.dumps(message).encode("utf-8")
-        # Enviar tamanho da mensagem (4 bytes) + mensagem
-        self.socket.sendall(struct.pack("<I", len(data)) + data)
-    
-    def _send_audio_chunk(self, chunk: bytes):
-        """Envia chunk de áudio"""
-        self._send_message({
-            "type": "audio-chunk",
-            "data": chunk.hex()
-        })
-    
-    def _receive_message(self) -> Optional[dict]:
-        """Recebe mensagem JSON do Wyoming"""
-        try:
-            # Receber tamanho da mensagem (4 bytes)
-            size_data = self.socket.recv(4)
-            if not size_data:
+            async with AsyncClient.from_uri(self.uri) as client:
+                logger.info(f"✅ Connected to Wyoming server")
+                
+                # Padrão Wyoming Satellite: AudioStart → AudioChunk(s) → AudioStop
+                # NÃO envia Transcribe (isso é para clientes ASR diretos)
+                
+                # 1. Enviar AudioStart
+                await client.write_event(
+                    AudioStart(
+                        rate=sample_rate,
+                        width=sample_width,
+                        channels=channels
+                    ).event()
+                )
+                logger.debug(f"📨 AudioStart (rate={sample_rate}Hz, {sample_width}B, {channels}ch)")
+                
+                # 2. Enviar áudio em chunks (padrão satellite: 1024 samples)
+                chunk_size = 1024 * sample_width * channels
+                total_chunks = (len(audio_data) + chunk_size - 1) // chunk_size
+                chunks_sent = 0
+                for i in range(0, len(audio_data), chunk_size):
+                    chunk = audio_data[i:i + chunk_size]
+                    await client.write_event(
+                        AudioChunk(
+                            rate=sample_rate,
+                            width=sample_width,
+                            channels=channels,
+                            audio=chunk
+                        ).event()
+                    )
+                    chunks_sent += 1
+                    
+                    # Log a cada 10 chunks ou no último
+                    if chunks_sent % 10 == 0 or chunks_sent == total_chunks:
+                        logger.debug(f"📦 Chunk {chunks_sent}/{total_chunks}")
+                
+                logger.debug(f"📦 {chunks_sent} chunks sent ({len(audio_data)} bytes)")
+                
+                # 3. Sinalizar fim do áudio
+                await client.write_event(AudioStop().event())
+                logger.info("🛑 AudioStop sent - waiting for transcript...")
+                
+                # 4. Aguardar resposta Transcript (como Wyoming Satellite)
+                timeout = 30.0
+                start_time = asyncio.get_event_loop().time()
+                
+                while True:
+                    if asyncio.get_event_loop().time() - start_time > timeout:
+                        logger.warning(f"⏰ Timeout after {timeout}s")
+                        return None
+                    
+                    event = await asyncio.wait_for(client.read_event(), timeout=5.0)
+                    
+                    if event is None:
+                        logger.debug("⚠️  Connection closed without response")
+                        break
+                    
+                    if Transcript.is_type(event.type):
+                        transcript = Transcript.from_event(event)
+                        text = transcript.text.strip()
+                        
+                        if text:
+                            logger.debug(f"� Received transcript: '{text}'")
+                            return text
+                        else:
+                            logger.debug("📥 Received empty transcript")
+                            return None
+                
+                logger.debug("⚠️  No transcript received")
                 return None
-            
-            size = struct.unpack("<I", size_data)[0]
-            
-            # Receber mensagem completa
-            data = b""
-            while len(data) < size:
-                chunk = self.socket.recv(size - len(data))
-                if not chunk:
-                    return None
-                data += chunk
-            
-            return json.loads(data.decode("utf-8"))
-            
-        except Exception as e:
-            logger.error(f"Error receiving message: {e}")
+                
+        except asyncio.TimeoutError:
+            logger.error("⏰ Timeout waiting for response from Wyoming (>30s)")
             return None
-    
-    def disconnect(self):
-        """Desconecta do servidor"""
-        if self.socket:
-            try:
-                self.socket.close()
-            except:
-                pass
-            self.socket = None
+        except Exception as e:
+            logger.error(f"❌ Error communicating with Wyoming: {e}")
+            logger.exception(e)
+            return None
 
 
 class AudioBuffer:
@@ -311,10 +290,8 @@ class ONVIFVoiceAssistant:
             duration = len(audio_data) / (self.config["sample_rate"] * 2)
             logger.debug(f"📤 Sending audio to Wyoming: {len(audio_data)} bytes ({duration:.2f}s)")
             
-            # Enviar para Wyoming Whisper
-            text = await asyncio.get_event_loop().run_in_executor(
-                None,
-                self.wyoming_client.send_audio,
+            # Enviar para Wyoming Whisper (agora é async)
+            text = await self.wyoming_client.send_audio(
                 audio_data,
                 self.config["sample_rate"]
             )
