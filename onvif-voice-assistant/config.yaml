@@ -11,6 +11,7 @@ arch:
 init: false
 startup: application
 boot: auto
+homeassistant_api: true
 map:
   - config:rw
 options:
@@ -26,7 +27,6 @@ options:
     - pattern: "ligar a luz"
       action: "light.turn_on"
       entity_id: "light.sala"
-  homeassistant_api: true
   log_level: "info"
 schema:
   wyoming_host: str
@@ -43,4 +43,3 @@ schema:
       entity_id: str?
       service_data: str?
   log_level: list(debug|info|warning|error)
-image: ghcr.io/homeassistant/{arch}-addon-onvif-voice-assistant
