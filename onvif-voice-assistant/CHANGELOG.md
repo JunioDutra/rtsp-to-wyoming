@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.4.3] - 2025-10-20
+### 🔄 Version Bump
+- Bump para forçar atualização no Supervisor
+
 ## [1.4.2] - 2025-10-20
 ### 🐛 Fixed
 - **Schema corrigido conforme documentação oficial**: Estrutura de `commands` agora valida corretamente
