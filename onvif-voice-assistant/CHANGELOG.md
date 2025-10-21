@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.2] - 2025-10-20
+### 🐛 Fixed
+- **Schema inválido impedindo addon de aparecer na loja**: Simplificado schema de `commands`
+  - Removida validação detalhada que causava erro no Supervisor
+  - Schema agora aceita lista de objetos genéricos
+  - Addon deve aparecer normalmente na loja após reload do repositório
+
 ## [1.4.1] - 2025-10-20
 ### ✨ New Features
 - **Múltiplas ações por comando**: Agora pode executar várias ações em um único comando de voz

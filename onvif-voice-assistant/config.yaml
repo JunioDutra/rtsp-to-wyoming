@@ -1,5 +1,5 @@
 name: ONVIF Voice Assistant
-version: "1.4.1"
+version: "1.4.2"
 slug: onvif_voice_assistant
 description: Voice recognition from ONVIF camera using Wyoming Faster Whisper
 arch:
@@ -46,10 +46,5 @@ schema:
   chunk_duration: float
   vad_enabled: bool
   vad_threshold: float
-  commands:
-    - pattern: str
-      action: str?
-      entity_id: str?
-      service_data: str?
-      actions: list?
+  commands: [str]
   log_level: list(debug|info|warning|error)
