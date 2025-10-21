@@ -2,10 +2,12 @@
 
 ## [1.4.2] - 2025-10-20
 ### 🐛 Fixed
-- **Schema inválido impedindo addon de aparecer na loja**: Simplificado schema de `commands`
-  - Removida validação detalhada que causava erro no Supervisor
-  - Schema agora aceita lista de objetos genéricos
+- **Schema corrigido conforme documentação oficial**: Estrutura de `commands` agora valida corretamente
+  - Schema seguindo padrão oficial: arrays aninhados com profundidade máxima 2
+  - Valida: `pattern`, `action`, `entity_id`, `service_data`
+  - Referência: https://developers.home-assistant.io/docs/add-ons/configuration/#options--schema
   - Addon deve aparecer normalmente na loja após reload do repositório
+  - Compatibilidade mantida: `app.py` aceita `action` OU `actions` em runtime
 
 ## [1.4.1] - 2025-10-20
 ### ✨ New Features

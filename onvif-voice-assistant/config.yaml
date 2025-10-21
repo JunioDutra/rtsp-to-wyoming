@@ -46,5 +46,9 @@ schema:
   chunk_duration: float
   vad_enabled: bool
   vad_threshold: float
-  commands: [str]
+  commands:
+    - pattern: str
+      action: str?
+      entity_id: str?
+      service_data: str?
   log_level: list(debug|info|warning|error)
