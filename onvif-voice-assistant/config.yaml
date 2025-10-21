@@ -1,5 +1,5 @@
 name: ONVIF Voice Assistant
-version: "1.4.0"
+version: "1.4.1"
 slug: onvif_voice_assistant
 description: Voice recognition from ONVIF camera using Wyoming Faster Whisper
 arch:
@@ -27,6 +27,15 @@ options:
     - pattern: "ligar a luz"
       action: "light.turn_on"
       entity_id: "light.sala"
+    # Exemplo com múltiplas ações:
+    # - pattern: "boa noite"
+    #   actions:
+    #     - action: "light.turn_off"
+    #       entity_id: "light.sala"
+    #     - action: "light.turn_off"
+    #       entity_id: "light.quarto"
+    #     - action: "switch.turn_on"
+    #       entity_id: "switch.alarme"
   log_level: "info"
 schema:
   wyoming_host: str
@@ -39,7 +48,8 @@ schema:
   vad_threshold: float
   commands:
     - pattern: str
-      action: str
+      action: str?
       entity_id: str?
       service_data: str?
+      actions: list?
   log_level: list(debug|info|warning|error)

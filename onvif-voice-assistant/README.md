@@ -63,6 +63,8 @@ log_level: "info"              # debug, info, warning, error
 
 ### Configuração de Comandos
 
+#### Formato Simples (uma ação por comando)
+
 ```yaml
 commands:
   - pattern: "ligar a luz"
@@ -72,7 +74,40 @@ commands:
   - pattern: "desligar a luz"
     action: "light.turn_off"
     entity_id: "light.sala"
+```
+
+#### Formato Avançado (múltiplas ações por comando)
+
+```yaml
+commands:
+  # Comando "boa noite" executa 4 ações sequenciais
+  - pattern: "boa noite"
+    actions:
+      - action: "light.turn_off"
+        entity_id: "light.sala"
+      - action: "light.turn_off"
+        entity_id: "light.quarto"
+      - action: "light.turn_off"
+        entity_id: "light.cozinha"
+      - action: "switch.turn_on"
+        entity_id: "switch.alarme"
   
+  # Comando "modo filme" ajusta várias coisas
+  - pattern: "modo filme"
+    actions:
+      - action: "light.turn_on"
+        entity_id: "light.tv"
+        service_data: '{"brightness": 30}'
+      - action: "light.turn_off"
+        entity_id: "light.teto"
+      - action: "media_player.turn_on"
+        entity_id: "media_player.tv_sala"
+```
+
+#### Outros Exemplos
+
+```yaml
+commands:
   - pattern: "ligar o ventilador"
     action: "switch.turn_on"
     entity_id: "switch.ventilador"
@@ -103,12 +138,18 @@ commands:
 
 #### Comandos
 
-Cada comando tem os seguintes campos:
+Cada comando suporta dois formatos:
 
+**Formato Simples (uma ação):**
 - **pattern**: Texto a ser reconhecido (case-insensitive)
 - **action**: Serviço do HA no formato `domain.service`
 - **entity_id**: (opcional) Entidade alvo
 - **service_data**: (opcional) Dados extras em JSON
+
+**Formato Avançado (múltiplas ações):**
+- **pattern**: Texto a ser reconhecido
+- **actions**: Lista de ações a executar sequencialmente
+  - Cada ação tem: `action`, `entity_id` (opcional), `service_data` (opcional)
 
 ## 🎙️ Como Usar
 

@@ -142,6 +142,14 @@ class AudioBuffer:
         self.max_silence_frames = 30  # ~900ms de silêncio (aumentado de 20)
         self.max_recording_frames = 1000  # Máximo 30s de gravação (1000 frames × 30ms)
         self.recorded_frames = 0
+        self.min_energy_threshold = 500  # Energia mínima para considerar como voz real (rejeita TV/rádio distante)
+        
+    def _calculate_energy(self, frame: bytes) -> float:
+        """Calcula energia RMS do frame de áudio"""
+        import array
+        samples = array.array('h', frame)  # 16-bit signed integers
+        sum_squares = sum(s * s for s in samples)
+        return (sum_squares / len(samples)) ** 0.5 if samples else 0
         
     def add_frame(self, frame: bytes) -> Optional[bytes]:
         """
@@ -153,6 +161,12 @@ class AudioBuffer:
             is_speech = self.vad.is_speech(frame, self.sample_rate)
         except:
             is_speech = True  # Se VAD falhar, assume que é fala
+        
+        # FILTRO DE ENERGIA: Rejeitar áudio de TV/rádio distante
+        energy = self._calculate_energy(frame)
+        if is_speech and energy < self.min_energy_threshold:
+            logger.debug(f"🔇 Low energy audio rejected: {energy:.0f} < {self.min_energy_threshold}")
+            is_speech = False
         
         if is_speech:
             if not self.is_speaking:
@@ -369,8 +383,8 @@ class ONVIFVoiceAssistant:
             
             # Exact match
             if text_clean == pattern:
-                logger.info(f"🎯 Command matched! Pattern: '{pattern}' → Action: {command['action']}")
-                await self._execute_action(command)
+                logger.info(f"🎯 Command matched! Pattern: '{pattern}'")
+                await self._execute_actions(command)
                 return
             
             # Partial match com palavras completas (ex: "por favor ligar a luz" deve dar match em "ligar a luz")
@@ -379,20 +393,46 @@ class ONVIFVoiceAssistant:
                 try:
                     indices = [text_words.index(word) for word in pattern_words]
                     if indices == sorted(indices):  # Palavras na ordem
-                        logger.info(f"🎯 Command matched! Pattern: '{pattern}' → Action: {command['action']}")
-                        await self._execute_action(command)
+                        logger.info(f"🎯 Command matched! Pattern: '{pattern}'")
+                        await self._execute_actions(command)
                         return
                 except ValueError:
                     pass
         
         logger.info(f"❌ No command matched for text: '{text_clean}'")
     
-    async def _execute_action(self, command: dict):
-        """Executa ação no Home Assistant"""
+    async def _execute_actions(self, command: dict):
+        """Executa uma ou múltiplas ações do comando"""
+        # Suporte para formato antigo (action único) e novo (actions lista)
+        if "actions" in command:
+            actions_list = command["actions"]
+            if not isinstance(actions_list, list):
+                actions_list = [actions_list]
+        elif "action" in command:
+            # Formato antigo: converter para lista
+            actions_list = [{
+                "action": command["action"],
+                "entity_id": command.get("entity_id"),
+                "service_data": command.get("service_data", {})
+            }]
+        else:
+            logger.error("❌ Command has no 'action' or 'actions' field!")
+            return
+        
+        logger.info(f"🚀 Executing {len(actions_list)} action(s)...")
+        
+        for idx, action_config in enumerate(actions_list, 1):
+            logger.info(f"  [{idx}/{len(actions_list)}] {action_config.get('action', 'unknown')}")
+            await self._execute_action(action_config)
+    
+    async def _execute_action(self, action_config: dict):
+        """Executa uma ação individual no Home Assistant"""
+    async def _execute_action(self, action_config: dict):
+        """Executa uma ação individual no Home Assistant"""
         try:
-            action = command["action"]
-            entity_id = command.get("entity_id")
-            service_data = command.get("service_data", {})
+            action = action_config.get("action")
+            entity_id = action_config.get("entity_id")
+            service_data = action_config.get("service_data", {})
             
             logger.debug(f"🚀 Executing: {action} on {entity_id}")
             

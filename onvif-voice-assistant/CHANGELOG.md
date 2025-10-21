@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.4.1] - 2025-10-20
+### ✨ New Features
+- **Múltiplas ações por comando**: Agora pode executar várias ações em um único comando de voz
+  - Formato antigo (`action` único) ainda funciona para compatibilidade
+  - Novo formato: use `actions` com lista de ações
+  - Exemplo: "boa noite" → desliga 3 luzes + liga alarme
+  - Logs mostram progresso: `[1/3] light.turn_off`, `[2/3] light.turn_off`, etc.
+
+### 🐛 Fixed
+- **VAD muito sensível detectando TV/rádio**: Adicionado filtro de energia mínima
+  - Calcula RMS energy de cada frame
+  - Rejeita áudio com energia < 500 (TV/rádio distante)
+  - Evita gravações de 35s+ de conversas de fundo
+  - Logs: `🔇 Low energy audio rejected: XXX < 500`
+
+### 🎯 Improvements
+- Melhor filtro de ruído ambiente
+- Reduz timeouts do Whisper (menos áudios longos enviados)
+- Foco em comandos de voz diretos para câmera
+
 ## [1.4.0] - 2025-10-20
 ### 🔄 Major Refactor
 - **ESTRUTURA S6-OVERLAY**: Refatorado para usar S6-overlay corretamente
